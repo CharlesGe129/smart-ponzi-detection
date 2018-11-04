@@ -3,3 +3,5 @@ Data mining model enabling early detection of Ponzi schemes implementation on Et
 
 
 # smart-ponzi-detection
+
+**fork from rionma/smart-ponzi-detection: https://github.com/rionma/smart-ponzi-detection**
