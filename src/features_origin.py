@@ -18,7 +18,6 @@
 
 """
 
-
 import numpy as np
 import pandas as pd
 import src.tools as tl
@@ -78,9 +77,10 @@ class Feature:
         ]
         self.opcodes = ['SWAP8', 'DUP11', 'DUP14', 'SWAP10', 'DUP15', 'LOG2', 'INVALID', 'SWAP9', 'SWAP5', 'SWAP12',
                         'SWAP16', 'DUP9', 'LOG1', 'DUP12', 'SWAP11', 'SWAP2', 'MSTORE8', 'SWAP14', 'DUP13', 'POP',
-                        'DUP1', 'DUP8','DUP7', 'DUP3', 'DUP4', 'MSTORE', 'SWAP3', 'CODECOPY', 'JUMP', 'DUP5', 'SWAP13',
+                        'DUP1', 'DUP8', 'DUP7', 'DUP3', 'DUP4', 'MSTORE', 'SWAP3', 'CODECOPY', 'JUMP', 'DUP5', 'SWAP13',
                         'STOP', 'CALLDATACOPY', 'SWAP7', 'SWAP1', 'SWAP6', 'RETURN', 'DUP6', 'SWAP4', 'REVERT', 'DUP2',
-                        'SELFDESTRUCT', 'DUP10', 'DUP16', 'JUMPI', 'SSTORE', 'PUSH', 'LOG3', 'LOG4', 'Missing', 'SWAP15']
+                        'SELFDESTRUCT', 'DUP10', 'DUP16', 'JUMPI', 'SSTORE', 'PUSH', 'LOG3', 'LOG4', 'Missing',
+                        'SWAP15']
         for i in self.op[0]:
             self.size_info.append(os.path.getsize(self.paths['db'] + 'bytecode/' + i + '.json'))
         for i in self.op[1]:
@@ -97,7 +97,7 @@ class Feature:
         with open(self.paths['db'] + 'tr_dico_nonponzi0.json', 'rb') as f:
             tr_dico[1] = json.loads(f.read())
             print("Reading tr_dico: " + str(len(tr_dico[1])))
-        for i in range(1, len(self.op[1])//500 + 1):
+        for i in range(1, len(self.op[1]) // 500 + 1):
             with open(self.paths['db'] + 'tr_dico_nonponzi' + str(i) + '.json', 'rb') as f:
                 tr_dico[1] += json.loads(f.read())
                 print("Reading tr_dico: " + str(len(tr_dico[1])))
@@ -106,9 +106,9 @@ class Feature:
 
     def compute_feature(self):
         print("computing features for ponzi...")
-        self.ft_names = [# 'addr',
-                         'ponzi', 'nbr_tx_in', 'nbr_tx_out', 'Tot_in', 'Tot_out', 'mean_in', 'mean_out', 'sdev_in',
-                         'sdev_out', 'gini_in', 'gini_out', 'avg_time_btw_tx', 'gini_time_out', 'lifetime']
+        self.ft_names = [  # 'addr',
+            'ponzi', 'nbr_tx_in', 'nbr_tx_out', 'Tot_in', 'Tot_out', 'mean_in', 'mean_out', 'sdev_in',
+            'sdev_out', 'gini_in', 'gini_out', 'avg_time_btw_tx', 'gini_time_out', 'lifetime']
         # ideas: lifetime,number of active days, max/min/avg delay between in and out, max/min balance
         self.cal_value_time_in_out()
 
@@ -167,7 +167,8 @@ class Feature:
         dum = self.df.drop(self.df[self.df[columns[0]] == 'ponzi'].index)
         df_out = dum[(
             np.abs(stats.zscore(
-                np.asarray(dum.drop(labels=[columns[0]] + columns[len(self.ft_names):], axis=1), dtype='float64'))) < out_index).all(
+                np.asarray(dum.drop(labels=[columns[0]] + columns[len(self.ft_names):], axis=1),
+                           dtype='float64'))) < out_index).all(
             axis=1)]
         self.df_out = df_out.append(self.df.drop(self.df[self.df[columns[0]] == 'non_ponzi'].index))
         self.cur_time = tl.compute_time(self.cur_time)
@@ -185,7 +186,7 @@ class Feature:
         '''
         plt.hist(df['avg_time_btw_tx@NUMERIC'][145:].astype('float32')/(60*60), bins = 15)
         plt.hist(df['avg_time_btw_tx@NUMERIC'][:145].astype('float32')/(60*60), bins = 15)
-    
+
         plt.xlabel('Delay between transactions (hours)')
         plt.ylabel('number of instances')
         plt.title('Delay between transacstions histogram for non ponzi')
@@ -232,6 +233,7 @@ class Feature:
 
         value = 10**18 ETH value
         '''
+
 
 if __name__ == '__main__':
     Feature().start()
