@@ -7,9 +7,10 @@ import src.tools as tl
 
 class EtherDataToFreqAndTrDisc:
     def __init__(self):
-        self.cur_time = 0
+        self.cur_time = time.clock()
         self.paths = dict()
         self.op = list()
+        self.opcodes = list()
 
     def define_path(self):
         self.cur_time = time.clock()
@@ -18,7 +19,7 @@ class EtherDataToFreqAndTrDisc:
 
         self.paths['database_nml'] = self.paths['db'] + 'normal.json'
         self.paths['database_int'] = self.paths['db'] + 'internal.json'
-        self.paths['database_op'] = self.paths['db'] + 'opcode/raw_opcodes/'
+        self.paths['database_op'] = self.paths['db'] + 'opcode/opcodes_count/'
 
         self.paths['database_nml_np'] = self.paths['db'] + 'normal_np.json'
         self.paths['database_int_np'] = self.paths['db'] + 'internal_np.json'
@@ -31,38 +32,35 @@ class EtherDataToFreqAndTrDisc:
             [fname.split('.json')[0] for fname in os.listdir(self.paths['database_op']) if fname.endswith('.json')],
             [fname.split('.json')[0] for fname in os.listdir(self.paths['database_op_np']) if fname.endswith('.json')]
         ]
+        self.opcodes = ['SWAP8', 'DUP11', 'DUP14', 'SWAP10', 'DUP15', 'LOG2', 'INVALID', 'SWAP9', 'SWAP5', 'SWAP12',
+                        'SWAP16', 'DUP9', 'LOG1', 'DUP12', 'SWAP11', 'SWAP2', 'MSTORE8', 'SWAP14', 'DUP13', 'POP',
+                        'DUP1', 'DUP8','DUP7', 'DUP3', 'DUP4', 'MSTORE', 'SWAP3', 'CODECOPY', 'JUMP', 'DUP5', 'SWAP13',
+                        'STOP', 'CALLDATACOPY', 'SWAP7', 'SWAP1', 'SWAP6', 'RETURN', 'DUP6', 'SWAP4', 'REVERT', 'DUP2',
+                        'SELFDESTRUCT', 'DUP10', 'DUP16', 'JUMPI', 'SSTORE', 'PUSH', 'LOG3', 'LOG4', 'Missing', 'SWAP15']
 
     def gen_op_freq(self):
         print("EtherDataToFreqAndTrDisc: generating op_freq.json")
-        opcodes = ['SWAP8', 'DUP11', 'DUP14', 'SWAP10', 'DUP15', 'LOG2', 'INVALID', 'SWAP9', 'SWAP5', 'SWAP12',
-                   'SWAP16',
-                   'DUP9', 'LOG1', 'DUP12', 'SWAP11', 'SWAP2', 'MSTORE8', 'SWAP14', 'DUP13', 'POP', 'DUP1', 'DUP8',
-                   'DUP7',
-                   'DUP3', 'DUP4', 'MSTORE', 'SWAP3', 'CODECOPY', 'JUMP', 'DUP5', 'SWAP13', 'STOP', 'CALLDATACOPY',
-                   'SWAP7',
-                   'SWAP1', 'SWAP6', 'RETURN', 'DUP6', 'SWAP4', 'REVERT', 'DUP2', 'SELFDESTRUCT', 'DUP10', 'DUP16',
-                   'JUMPI',
-                   'SSTORE', 'PUSH', 'LOG3', 'LOG4', 'Missing', 'SWAP15']
         op_freq = [[], []]
         aaa = 0
         for i in range(2):
             db_path = self.paths['database_op'] if i == 0 else self.paths['database_op_np']
             for add in self.op[i]:
                 aaa += 1
-                print(f'{aaa}, {add}')
+                # print(f'{aaa}, {add}')
                 with open(db_path + add + '.json', 'r') as f:
                     raw = f.readlines()
-                    res = [0 for i in range(len(opcodes))]
+                    res = [0 for i in range(len(self.opcodes))]
                     if len(raw) > 1:
                         tot = 0
                         for opcode in raw:
                             opcode = opcode.strip(' \n')
-                            if opcode.startswith('#') or opcode.startswith(':label') or not opcode or 'Missing opcode' in opcode:
+                            if opcode.startswith('#') or opcode.startswith(':label') or not opcode:
                                 continue
-                            tot += 1
                             code = opcode.split('\t')[1].split('(')[0] if '\t' in opcode else opcode.split(' ')[1].split('(')[0]
-                            res[opcodes.index(code)] += 1
-                    tot = max(1, tot)
+                            count = int(opcode.split(' ')[0])
+                            tot += count
+                            res[self.opcodes.index(code)] += count
+                    tot = tot if len(raw) > 1 else 1
                     res = [x / tot for x in res]
                     op_freq[i].append(res)
 
@@ -74,7 +72,7 @@ class EtherDataToFreqAndTrDisc:
 
     def gen_tr_dico(self):
         # tr_dico is ordered by op[]
-        # tr_dico[p=0, np=1][# of TXs][nml=0, int=1][list of TXs in nml.json] = {'blockNumber': xxx} = dict()
+        # tr_dico[p=0, np=1][# of Contracts][nml=0, int=1][list of TXs in nml.json] = {'blockNumber': xxx} = dict()
         tr_dico = [[[0, 0] for i in range(len(self.op[0]))], [[0, 0] for i in range(len(self.op[1]))]]
         file_paths = ['database_nml', 'database_int', 'database_nml_np', 'database_int_np']
         op_indices = [0, 0, 1, 1]
@@ -108,11 +106,58 @@ class EtherDataToFreqAndTrDisc:
         with open(self.paths['db'] + 'tr_dico_ponzi.json', 'w') as f:
             f.write(json.dumps(tr_dico[0]))
 
+    def gen_op_freq_origin(self):
+        op_freq = [[], []]
+        for add in self.op[0]:
+            with open(self.paths['database_op'] + add + '.json', 'r') as f:
+                # print(self.paths['database_op'] + add + '.json')
+                raw = f.readlines()
+                res = [0 for i in range(len(self.opcodes))]
+                if len(raw) > 1:
+                    tot = 0
+                    for opcode in raw:
+                        # count = number % 10 instead of number?
+                        count = float(opcode[3])
+                        tot += count
+                        res[self.opcodes.index(opcode[5:-1])] = count
+                else:
+                    tot = 1
+                res = [x / tot for x in res]
+                op_freq[0].append(res)
+                print(res)
+
+        # non ponzi instances
+
+        for add in self.op[1]:
+            with open(self.paths['database_op_np'] + add + '.json', 'r') as f:
+                raw = f.readlines()
+                res = [0 for i in range(len(self.opcodes))]
+                if len(raw) > 1:
+                    tot = 0
+                    for opcode in raw:
+                        # count = number % 10 instead of number?
+                        count = float(opcode[3])
+                        tot += count
+                        res[self.opcodes.index(opcode[5:-1])] = count
+                else:
+                    tot = 1
+
+                res = [x / tot for x in res]
+                op_freq[1].append(res)
+                print(res)
+
+        t2 = tl.compute_time(self.cur_time)
+
+        with open(self.paths['db'] + 'op_freq.json', 'w') as outfile:
+            outfile.write(json.dumps(op_freq))
+            print('op_freq serialized')
+
     def start(self):
         self.define_path()
         self.load_op()
-        self.gen_op_freq()
-        self.gen_tr_dico()
+        self.gen_op_freq_origin()
+        # self.gen_op_freq()
+        # self.gen_tr_dico()
 
 
 if __name__ == '__main__':
