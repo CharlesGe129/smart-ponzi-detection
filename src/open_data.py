@@ -68,6 +68,9 @@ class EtherDataToFreqAndTrDisc:
 
         print(f"{len(op_freq[0])}, {len(op_freq[1])}")
         self.cur_time = tl.compute_time(self.cur_time)
+        with open(self.paths['db'] + 'op_freq.json', 'w') as outfile:
+            outfile.write(json.dumps(op_freq))
+            print('op_freq serialized')
 
     def gen_tr_dico(self):
         # tr_dico is ordered by op[]
