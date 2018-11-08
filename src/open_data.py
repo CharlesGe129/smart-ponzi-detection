@@ -5,6 +5,13 @@ import os
 import src.tools as tl
 
 
+OPCODES = ['SWAP8', 'DUP11', 'DUP14', 'SWAP10', 'DUP15', 'LOG2', 'INVALID', 'SWAP9', 'SWAP5', 'SWAP12', 'SWAP16',
+           'DUP9', 'LOG1', 'DUP12', 'SWAP11', 'SWAP2', 'MSTORE8', 'SWAP14', 'DUP13', 'POP', 'DUP8','DUP7',
+           'DUP3', 'DUP4', 'MSTORE', 'SWAP3', 'CODECOPY', 'JUMP', 'DUP5', 'SWAP13', 'STOP', 'CALLDATACOPY', 'SWAP7',
+           'SWAP1', 'SWAP6', 'RETURN', 'DUP6', 'SWAP4', 'REVERT', 'SELFDESTRUCT', 'DUP10', 'DUP16', 'JUMPI',
+           'SSTORE', 'PUSH', 'LOG3', 'LOG4', 'Missing', 'SWAP15', 'DUP1&2']
+
+
 class EtherDataToFreqAndTrDisc:
     def __init__(self):
         self.cur_time = time.clock()
@@ -32,11 +39,7 @@ class EtherDataToFreqAndTrDisc:
             [fname.split('.json')[0] for fname in os.listdir(self.paths['database_op']) if fname.endswith('.json')],
             [fname.split('.json')[0] for fname in os.listdir(self.paths['database_op_np']) if fname.endswith('.json')]
         ]
-        self.opcodes = ['SWAP8', 'DUP11', 'DUP14', 'SWAP10', 'DUP15', 'LOG2', 'INVALID', 'SWAP9', 'SWAP5', 'SWAP12',
-                        'SWAP16', 'DUP9', 'LOG1', 'DUP12', 'SWAP11', 'SWAP2', 'MSTORE8', 'SWAP14', 'DUP13', 'POP',
-                        'DUP1', 'DUP8','DUP7', 'DUP3', 'DUP4', 'MSTORE', 'SWAP3', 'CODECOPY', 'JUMP', 'DUP5', 'SWAP13',
-                        'STOP', 'CALLDATACOPY', 'SWAP7', 'SWAP1', 'SWAP6', 'RETURN', 'DUP6', 'SWAP4', 'REVERT', 'DUP2',
-                        'SELFDESTRUCT', 'DUP10', 'DUP16', 'JUMPI', 'SSTORE', 'PUSH', 'LOG3', 'LOG4', 'Missing', 'SWAP15']
+        self.opcodes = OPCODES
 
     def gen_op_freq(self):
         print("EtherDataToFreqAndTrDisc: generating op_freq.json")
@@ -57,6 +60,7 @@ class EtherDataToFreqAndTrDisc:
                             if opcode.startswith('#') or opcode.startswith(':label') or not opcode:
                                 continue
                             code = opcode.split('\t')[1].split('(')[0] if '\t' in opcode else opcode.split(' ')[1].split('(')[0]
+                            code = 'DUP1&2' if code in ['DUP1', 'DUP2'] else code
                             count = int(opcode.split(' ')[0])
                             tot += count
                             res[self.opcodes.index(code)] += count
@@ -155,8 +159,8 @@ class EtherDataToFreqAndTrDisc:
     def start(self):
         self.define_path()
         self.load_op()
-        self.gen_op_freq_origin()
-        # self.gen_op_freq()
+        # self.gen_op_freq_origin()
+        self.gen_op_freq()
         # self.gen_tr_dico()
 
 
