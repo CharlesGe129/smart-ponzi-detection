@@ -29,6 +29,7 @@ import json
 import time
 from sklearn import preprocessing
 import matplotlib.pyplot as plt
+from src.open_data import OPCODES
 
 
 class Feature:
@@ -56,7 +57,7 @@ class Feature:
 
     def define_path(self):
         print("Feature: define variable and load data")
-        self.paths['db'] = '../Marion_files/sm_database/'
+        self.paths['db'] = './Marion_files/sm_database/'
 
         self.paths['database_nml'] = self.paths['db'] + 'normal.json'
         self.paths['database_int'] = self.paths['db'] + 'internal.json'
@@ -76,11 +77,7 @@ class Feature:
             [fname.split('.json')[0] for fname in os.listdir(self.paths['database_op']) if fname.endswith('.json')],
             [fname.split('.json')[0] for fname in os.listdir(self.paths['database_op_np']) if fname.endswith('.json')]
         ]
-        self.opcodes = ['SWAP8', 'DUP11', 'DUP14', 'SWAP10', 'DUP15', 'LOG2', 'INVALID', 'SWAP9', 'SWAP5', 'SWAP12',
-                        'SWAP16', 'DUP9', 'LOG1', 'DUP12', 'SWAP11', 'SWAP2', 'MSTORE8', 'SWAP14', 'DUP13', 'POP',
-                        'DUP1', 'DUP8','DUP7', 'DUP3', 'DUP4', 'MSTORE', 'SWAP3', 'CODECOPY', 'JUMP', 'DUP5', 'SWAP13',
-                        'STOP', 'CALLDATACOPY', 'SWAP7', 'SWAP1', 'SWAP6', 'RETURN', 'DUP6', 'SWAP4', 'REVERT', 'DUP2',
-                        'SELFDESTRUCT', 'DUP10', 'DUP16', 'JUMPI', 'SSTORE', 'PUSH', 'LOG3', 'LOG4', 'Missing', 'SWAP15']
+        self.opcodes = OPCODES
         for i in self.op[0]:
             self.size_info.append(os.path.getsize(self.paths['db'] + 'bytecode/' + i + '.json'))
         for i in self.op[1]:
@@ -116,7 +113,7 @@ class Feature:
         ft = []
         len_op = [len(self.op[0]), len(self.op[1])]
         for tr_index in range(2):
-            print('computing features for' + 'ponzi' if tr_index == 0 else 'non ponzi')
+            print('computing features for ' + ('ponzi' if tr_index == 0 else 'non ponzi'))
             for i in range(len_op[tr_index]):
                 val_in = []
                 val_out = []
@@ -139,7 +136,7 @@ class Feature:
                 res = tl.basic_features('ponzi' if tr_index == 0 else 'non_ponzi',
                                         np.asarray(val_in), np.asarray(val_out),
                                         np.asarray(time_in), np.asarray(time_out))
-                ft.append(np.concatenate((res, np.asarray(self.op_freq[tr_index][i], dtype='float32'))))
+                ft.append(np.concatenate((res, np.asarray(self.op_freq[tr_index][i], dtype='float64'))))
             self.cur_time = tl.compute_time(self.cur_time)
         self.ft = ft
 
@@ -193,8 +190,8 @@ class Feature:
         '''
 
     def nml_int_file_format(self):
-        '''
-        normal : {
+        """
+        normal.json : {
         (0)'blockNumber': 'n',
         (1)'timeStamp': 'n'
         (2) 'hash': '0x..',
@@ -214,7 +211,7 @@ class Feature:
         (16)'gasUsed': 'n,
         (17)'confirmations': 'n'}
 
-        internal :{
+        internal.json :{
         (0)'blockNumber',
         (1)'timeStamp',
         (2)'hash',
@@ -231,7 +228,7 @@ class Feature:
         (13)'errCode'}
 
         value = 10**18 ETH value
-        '''
+        """
 
 if __name__ == '__main__':
     Feature().start()
