@@ -57,7 +57,7 @@ class Feature:
 
     def define_path(self):
         print("Feature: define variable and load data")
-        self.paths['db'] = './Marion_files/sm_database/'
+        self.paths['db'] = '../Marion_files/sm_database/'
 
         self.paths['database_nml'] = self.paths['db'] + 'normal.json'
         self.paths['database_int'] = self.paths['db'] + 'internal.json'
@@ -72,6 +72,7 @@ class Feature:
         pass
 
     def load_op(self):
+        # op[p=0, np=1][index] = contract_address
         print("Loading op, opcodes, op_freq, size_info...")
         self.op = [
             [fname.split('.json')[0] for fname in os.listdir(self.paths['database_op']) if fname.endswith('.json')],
@@ -87,6 +88,7 @@ class Feature:
         self.cur_time = tl.compute_time(self.cur_time)
 
     def load_tr_dico(self):
+        # tr_dico[p=0, np=1][# of Contracts][nml=0, int=1][list of TXs in nml.json] = {'blockNumber': xxx} = dict()
         tr_dico = [[], []]
         with open(self.paths['db'] + 'tr_dico_ponzi.json', 'rb') as f:
             tr_dico[0] = json.loads(f.read())
@@ -107,9 +109,9 @@ class Feature:
                          'ponzi', 'nbr_tx_in', 'nbr_tx_out', 'Tot_in', 'Tot_out', 'mean_in', 'mean_out', 'sdev_in',
                          'sdev_out', 'gini_in', 'gini_out', 'avg_time_btw_tx', 'gini_time_out', 'lifetime']
         # ideas: lifetime,number of active days, max/min/avg delay between in and out, max/min balance
-        self.cal_value_time_in_out()
+        self.cal_advanced_features()
 
-    def cal_value_time_in_out(self):
+    def cal_advanced_features(self):
         ft = []
         len_op = [len(self.op[0]), len(self.op[1])]
         for tr_index in range(2):
@@ -121,24 +123,27 @@ class Feature:
                 time_out = []
                 birth = float(self.tr_dico[tr_index][i][0][0]['timeStamp'])
                 for tx in self.tr_dico[tr_index][i][0] + self.tr_dico[tr_index][i][1]:
+                    contract_hash = self.op[tr_index][i]
                     timestamp = float(tx['timeStamp'])
                     if (timestamp - birth) / (60 * 60 * 24) <= self.J:
-                        if tx['from'] == '' or tx['from'] == self.op[tr_index][i]:
-                            val_out.append(float(tx['value']))
-                            time_out.append(timestamp)
-                        else:
-                            val_in.append(float(tx['value']))
-                            time_in.append(timestamp)
-                val_in = np.asarray(val_in)
-                val_out = np.asarray(val_out)
-                time_in = np.asarray(time_in)
-                time_out = np.asarray(time_out)
+                        self.cal_value_time_in_out({'tx': tx, 'contract_hash': contract_hash, 'val_in': val_in,
+                                                    'val_out': val_out, 'time_in': time_in, 'time_out': time_out,
+                                                    'timestamp': timestamp})
                 res = tl.basic_features('ponzi' if tr_index == 0 else 'non_ponzi',
                                         np.asarray(val_in), np.asarray(val_out),
                                         np.asarray(time_in), np.asarray(time_out))
                 ft.append(np.concatenate((res, np.asarray(self.op_freq[tr_index][i], dtype='float64'))))
             self.cur_time = tl.compute_time(self.cur_time)
         self.ft = ft
+
+    @staticmethod
+    def cal_value_time_in_out(args):
+        if args['tx']['from'] in ['', args['contract_hash']]:
+            args['val_out'].append(float(args['tx']['value']))
+            args['time_out'].append(args['timestamp'])
+        else:
+            args['val_in'].append(float(args['tx']['value']))
+            args['time_in'].append(args['timestamp'])
 
     def create_pandas_dataframe(self):
         print("Creating pandas dataframe...")
