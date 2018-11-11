@@ -22,15 +22,18 @@ class EtherDataToFreqAndTrDisc:
     def define_path(self):
         self.cur_time = time.clock()
         print("EtherDataToFreqAndTrDisc: define variables...")
-        self.paths['db'] = '../Marion_files/sm_database/'
+        # self.paths['db'] = '../dataset/sm_database/'
+        self.paths['db'] = '../dataset/'
 
         self.paths['database_nml'] = self.paths['db'] + 'normal.json'
         self.paths['database_int'] = self.paths['db'] + 'internal.json'
-        self.paths['database_op'] = self.paths['db'] + 'opcode/opcodes_count/'
+        # self.paths['database_op'] = self.paths['db'] + 'opcode/opcodes_count/'
+        self.paths['database_op'] = self.paths['db'] + 'ponzi_opcode/'
 
         self.paths['database_nml_np'] = self.paths['db'] + 'normal_np.json'
         self.paths['database_int_np'] = self.paths['db'] + 'internal_np.json'
-        self.paths['database_op_np'] = self.paths['db'] + 'opcode_np/opcode_count/bytecode_np/'
+        # self.paths['database_op_np'] = self.paths['db'] + 'opcode_np/opcode_count/bytecode_np/'
+        self.paths['database_op_np'] = self.paths['db'] + 'non_ponzi_opcode/'
 
         self.cur_time = tl.compute_time(self.cur_time)
 
@@ -161,7 +164,7 @@ class EtherDataToFreqAndTrDisc:
         self.load_op()
         # self.gen_op_freq_origin()
         self.gen_op_freq()
-        # self.gen_tr_dico()
+        self.gen_tr_dico()
 
 
 if __name__ == '__main__':
