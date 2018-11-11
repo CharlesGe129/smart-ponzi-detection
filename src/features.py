@@ -106,8 +106,10 @@ class Feature:
     def compute_feature(self):
         print("computing features for ponzi...")
         self.ft_names = [# 'addr',
-                         'ponzi', 'nbr_tx_in', 'nbr_tx_out', 'Tot_in', 'Tot_out', 'mean_in', 'mean_out', 'sdev_in',
-                         'sdev_out', 'gini_in', 'gini_out', 'avg_time_btw_tx', 'gini_time_out', 'lifetime']
+                         'ponzi', 'nbr_tx_in', 'nbr_tx_out', 'Tot_in', 'Tot_out',
+                         'num_paid_in_addr', 'num_paid_out_addr', 'overlap_in_out_addr',
+                         'mean_in', 'mean_out', 'sdev_in', 'sdev_out', 'gini_in', 'gini_out', 'avg_time_btw_tx',
+                         'gini_time_out', 'lifetime']
         # ideas: lifetime,number of active days, max/min/avg delay between in and out, max/min balance
         self.cal_advanced_features()
 
@@ -117,21 +119,32 @@ class Feature:
         for tr_index in range(2):
             print('computing features for ' + ('ponzi' if tr_index == 0 else 'non ponzi'))
             for i in range(len_op[tr_index]):
+                # for each contract
                 val_in = []
                 val_out = []
                 time_in = []
                 time_out = []
+                pay_in = 0
+                pay_out = 0
+                addr_in = set()
+                addr_out = set()
                 birth = float(self.tr_dico[tr_index][i][0][0]['timeStamp'])
                 for tx in self.tr_dico[tr_index][i][0] + self.tr_dico[tr_index][i][1]:
+                    # for each tx of that contract
                     contract_hash = self.op[tr_index][i]
                     timestamp = float(tx['timeStamp'])
                     if (timestamp - birth) / (60 * 60 * 24) <= self.J:
                         self.cal_value_time_in_out({'tx': tx, 'contract_hash': contract_hash, 'val_in': val_in,
                                                     'val_out': val_out, 'time_in': time_in, 'time_out': time_out,
                                                     'timestamp': timestamp})
-                res = tl.basic_features('ponzi' if tr_index == 0 else 'non_ponzi',
-                                        np.asarray(val_in), np.asarray(val_out),
-                                        np.asarray(time_in), np.asarray(time_out))
+                    (pay_in, pay_out) = self.cal_addr_in_out({'tx': tx, 'contract_hash': contract_hash,
+                                                              'pay_in': pay_in, 'pay_out': pay_out, 'addr_in': addr_in,
+                                                              'addr_out': addr_out})
+                num_overlap_addr = len(addr_in.intersection(addr_out))
+                res = tl.basic_features({'ponzi': 'ponzi' if tr_index == 0 else 'non_ponzi',
+                                         'val_in': np.asarray(val_in), 'val_out': np.asarray(val_out),
+                                         'time_in': np.asarray(time_in), 'time_out': np.asarray(time_out),
+                                         'pay_in': pay_in, 'pay_out': pay_out, 'num_overlap_addr': num_overlap_addr})
                 ft.append(np.concatenate((res, np.asarray(self.op_freq[tr_index][i], dtype='float64'))))
             self.cur_time = tl.compute_time(self.cur_time)
         self.ft = ft
@@ -144,6 +157,18 @@ class Feature:
         else:
             args['val_in'].append(float(args['tx']['value']))
             args['time_in'].append(args['timestamp'])
+
+    @staticmethod
+    def cal_addr_in_out(args):
+        tx = args['tx']
+        contract_hash = args['contract_hash']
+        if tx['from'] in [contract_hash, '']:
+            args['pay_out'] += 1
+            args['addr_out'].add(tx['to'])
+        if tx['to'] in [contract_hash, '']:
+            args['pay_in'] += 1
+            args['addr_in'].add(tx['from'])
+        return args['pay_in'], args['pay_out']
 
     def create_pandas_dataframe(self):
         print("Creating pandas dataframe...")

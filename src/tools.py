@@ -64,42 +64,51 @@ def compute_time(t0):
 
 
 def mean(tab, s):
-    if s>0:
+    if s > 0:
         return np.mean(tab)
-    else :
+    else:
         return s
-    
-def std(tab,s):
-    if s>0:
+
+
+def std(tab, s):
+    if s > 0:
         return np.std(tab)
     else:
         return s
 
+
 def maxi(tab):
-    if len(tab)>0:
+    if len(tab) > 0:
         return np.max(tab)
     else:
         return 0
-        
-def basic_features(ponzi, val_in,val_out,time_in,time_out):
-    N_in =int(val_in.size)
-    N_out = int(val_out.size)
-    times = np.concatenate((time_in, time_out))
 
+
+def basic_features(args):
+    val_in = args['val_in']
+    val_out = args['val_out']
+    time_in = args['time_in']
+    time_out = args['time_out']
+    num_val_in = int(np.asarray(val_in).size)
+    num_val_out = int(np.asarray(val_out).size)
+    times = np.concatenate((np.asarray(time_in), np.asarray(time_out)))
 
     res = np.asarray([
-            ponzi,
-            N_in,
-            N_out,
+            args['ponzi'],
+            num_val_in,
+            num_val_out,
             np.sum(val_in),
             np.sum(val_out),
-            mean(val_in, N_in), 
-            mean(val_out, N_out),
-            std(val_in,N_in),
-            std(val_out,N_out),
+            args['pay_in'],
+            args['pay_out'],
+            args['num_overlap_addr'],
+            mean(val_in, num_val_in),
+            mean(val_out, num_val_out),
+            std(val_in, num_val_in),
+            std(val_out, num_val_out),
             gini(val_in),
             gini(val_out),
-            (np.max(times)-np.min(times))/(N_in +N_out),
+            (np.max(times) - np.min(times))/(num_val_in + num_val_out),
             gini(time_out),
             np.max(times)-np.min(times),
             ])
