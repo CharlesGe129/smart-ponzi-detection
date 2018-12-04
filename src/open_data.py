@@ -24,12 +24,12 @@ class EtherDataToFreqAndTrDisc:
         print("EtherDataToFreqAndTrDisc: define variables...")
         self.paths['db'] = '../dataset/'
 
-        self.paths['database_nml'] = self.paths['db'] + 'normal.json'
-        self.paths['database_int'] = self.paths['db'] + 'internal.json'
+        self.paths['database_nml'] = self.paths['db'] + 'sm_database/normal.json'
+        self.paths['database_int'] = self.paths['db'] + 'sm_database/internal.json'
         self.paths['database_op'] = self.paths['db'] + 'ponzi/op_count/'
 
-        self.paths['database_nml_np'] = self.paths['db'] + 'normal_np.json'
-        self.paths['database_int_np'] = self.paths['db'] + 'internal_np.json'
+        self.paths['database_nml_np'] = self.paths['db'] + 'sm_database/normal_np.json'
+        self.paths['database_int_np'] = self.paths['db'] + 'sm_database/internal_np.json'
         self.paths['database_op_np'] = self.paths['db'] + 'non_ponzi/op_count/'
 
         # # For original data Marion_files
@@ -41,9 +41,10 @@ class EtherDataToFreqAndTrDisc:
 
     def load_op(self):
         self.op = [
-            [fname.split('.json')[0] for fname in os.listdir(self.paths['database_op']) if fname.endswith('.json')],
-            [fname.split('.json')[0] for fname in os.listdir(self.paths['database_op_np']) if fname.endswith('.json')]
+            [fname.split('.csv')[0] for fname in os.listdir(self.paths['database_op']) if fname.endswith('.csv')],
+            [fname.split('.csv')[0] for fname in os.listdir(self.paths['database_op_np']) if fname.endswith('.csv')]
         ]
+        print("op length: " + str(len(self.op[0])) + ", " + str(len(self.op[1])))
         self.opcodes = OPCODES
 
     def gen_op_counts(self):
@@ -57,7 +58,8 @@ class EtherDataToFreqAndTrDisc:
                 print(f"{i}, {filename}")
                 if not filename.endswith('.json'):
                     continue
-                self.gen_one_op_count(opcode_paths[op_index] + filename, output_path[op_index] + filename)
+                self.gen_one_op_count(opcode_paths[op_index] + filename,
+                                      output_path[op_index] + filename.replace('.json', '.csv'))
 
     @staticmethod
     def gen_one_op_count(data_path, output_path):
@@ -76,36 +78,30 @@ class EtherDataToFreqAndTrDisc:
                 if code in ['DUP1', 'DUP2']:
                     code = 'DUP1&2'
                 elif code.startswith('Missing'):
-                    continue
+                    code = 'Missing'
                 if code not in OPCODES:
                     print(code)
                 else:
                     codes[OPCODES.index(code)] += 1
-        with open(output_path.replace('.json', '.csv'), 'w') as f_count:
+        with open(output_path, 'w') as f_count:
             f_count.write('\n'.join(
                 [OPCODES[i] + ',' + str(codes[i]) for i in range(len(OPCODES)) if codes[i] != 0]))
 
     def gen_op_freq(self):
         print("EtherDataToFreqAndTrDisc: generating op_freq.json")
         op_freq = [[], []]
-        aaa = 0
         for i in range(2):
             db_path = self.paths['database_op'] if i == 0 else self.paths['database_op_np']
-            for add in self.op[i]:
-                aaa += 1
-                # print(f'{aaa}, {add}')
-                with open(db_path + add + '.json', 'r') as f:
+            for addr in self.op[i]:
+                with open(db_path + addr + '.csv', 'r') as f:
                     raw = f.readlines()
                     res = [0 for i in range(len(self.opcodes))]
                     if len(raw) > 1:
                         tot = 0
                         for opcode in raw:
-                            opcode = opcode.strip(' \n')
-                            if opcode.startswith('#') or opcode.startswith(':label') or not opcode:
-                                continue
-                            code = opcode.split('\t')[1].split('(')[0] if '\t' in opcode else opcode.split(' ')[1].split('(')[0]
-                            code = 'DUP1&2' if code in ['DUP1', 'DUP2'] else code
-                            count = int(opcode.split(' ')[0])
+                            opcode = opcode.strip('\n')
+                            code = opcode.split(',')[0]
+                            count = int(opcode.split(',')[1])
                             tot += count
                             res[self.opcodes.index(code)] += count
                     tot = tot if len(raw) > 1 else 1
@@ -150,7 +146,7 @@ class EtherDataToFreqAndTrDisc:
         for i in range(len(self.op[1])//500 + 1):
             with open(self.paths['db'] + 'tr_dico_nonponzi' + str(i) + '.json', 'w') as f:
                 f.write(json.dumps(tr_dico[1][i*500:(i+1)*500]))
-                print('serialized #' + str(i) + ' tr_dico from ')
+                print('serialized #' + str(i) + ' tr_dico from ' + str(i*500) + ' to ' + str((i+1)*500))
         with open(self.paths['db'] + 'tr_dico_ponzi.json', 'w') as f:
             f.write(json.dumps(tr_dico[0]))
 
@@ -203,9 +199,9 @@ class EtherDataToFreqAndTrDisc:
     def start(self):
         self.define_path()
         self.gen_op_counts()
-        # self.load_op()
+        self.load_op()
         # self.gen_op_freq_origin()
-        # self.gen_op_freq()
+        self.gen_op_freq()
         # self.gen_tr_dico()
 
 

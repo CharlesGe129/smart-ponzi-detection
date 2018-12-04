@@ -48,16 +48,22 @@ class EthCrawlerNormalTx:
         self.count = 0
 
     def start(self):
-        with open(saved_file, 'w') as nml:
-            nml.close()
+        # with open(self.saved_file, 'w') as nml:
+        #     nml.close()
         [self.crawl(addr) for addr in self.addresses]
 
     def crawl(self, addr):
         self.count += 1
         print(addr + ', progress: ' + str(round(self.count/self.addr_len*100, 2)) + '%')
-        url = self.url_nml_pattern.format(addr)
-        response = requests.get(url)
-        with open(saved_file, 'a') as f:
+        while True:
+            try:
+                url = self.url_nml_pattern.format(addr)
+                response = requests.get(url)
+                break
+            except Exception as e:
+                print("Error: ")
+                print(e)
+        with open(self.saved_file, 'a') as f:
             f.write(addr + '\n')
             f.write(response.text[38:-1] + '\n')
 
@@ -72,16 +78,22 @@ class EthCrawlerInternalTx:
         self.count = 0
 
     def start(self):
-        with open(saved_file, 'w') as int:
-            int.close()
+        # with open(self.saved_file, 'w') as int:
+        #     int.close()
         [self.crawl(addr) for addr in self.addresses]
 
     def crawl(self, addr):
         self.count += 1
         print(addr + ', progress: ' + str(round(self.count/self.addr_len*100, 2)) + '%')
-        url = self.url_nml_pattern.format(addr)
-        response = requests.get(url)
-        with open(saved_file, 'a') as f:
+        while True:
+            try:
+                url = self.url_nml_pattern.format(addr)
+                response = requests.get(url)
+                break
+            except Exception as e:
+                print("Error: ")
+                print(e)
+        with open(self.saved_file, 'a') as f:
             f.write(addr + "\n")
             f.write(response.text[38:-1] + '\n' if response.text[25:27] == 'OK' else '[]\n')
 

@@ -44,29 +44,38 @@ class Feature:
         self.op_freq = dict()
         self.ft_names = list()
         self.ft = list()
+        self.ft_opcodes = list()
+        self.ft_basic = list()
         self.df = None
-        self.df_out = None
+        self.df_opcodes = None
+        self.df_basic = None
 
     def start(self):
         self.define_path()
         self.load_op()
         self.load_tr_dico()
         self.compute_feature()
-        self.create_pandas_dataframe()
+        self.df = self.create_pandas_dataframe(self.ft, self.ft_names + self.opcodes)
+        self.df_opcodes = self.create_pandas_dataframe(self.ft_opcodes, ['ponzi'] + self.opcodes)
+        self.df_basic = self.create_pandas_dataframe(self.ft_basic, self.ft_names)
         self.dump_arff()
 
     def define_path(self):
         print("Feature: define variable and load data")
-        self.paths['db'] = '../Marion_files/sm_database/'
+        self.paths['db'] = '../dataset/'
 
         self.paths['database_nml'] = self.paths['db'] + 'normal.json'
         self.paths['database_int'] = self.paths['db'] + 'internal.json'
-        # Same as opcode/raw_opcodes/ in origin feature.py
-        self.paths['database_op'] = self.paths['db'] + 'opcode/opcodes_count/'
+        self.paths['database_op'] = self.paths['db'] + 'ponzi/op_count/'
 
         self.paths['database_nml_np'] = self.paths['db'] + 'normal_np.json'
         self.paths['database_int_np'] = self.paths['db'] + 'internal_np.json'
-        self.paths['database_op_np'] = self.paths['db'] + 'opcode_np/opcode_count/bytecode_np/'
+        self.paths['database_op_np'] = self.paths['db'] + 'non_ponzi/op_count/'
+
+        # # For original data Marion_files
+        # self.paths['db'] = '../dataset/sm_database/'
+        # self.paths['database_op'] = self.paths['db'] + 'opcode/opcodes_count/'
+        # self.paths['database_op_np'] = self.paths['db'] + 'opcode_np/opcode_count/bytecode_np/'
 
         self.cur_time = tl.compute_time(self.cur_time)
         pass
@@ -75,14 +84,14 @@ class Feature:
         # op[p=0, np=1][index] = contract_address
         print("Loading op, opcodes, op_freq, size_info...")
         self.op = [
-            [fname.split('.json')[0] for fname in os.listdir(self.paths['database_op']) if fname.endswith('.json')],
-            [fname.split('.json')[0] for fname in os.listdir(self.paths['database_op_np']) if fname.endswith('.json')]
+            [fname.split('.csv')[0] for fname in os.listdir(self.paths['database_op']) if fname.endswith('.csv')],
+            [fname.split('.csv')[0] for fname in os.listdir(self.paths['database_op_np']) if fname.endswith('.csv')]
         ]
         self.opcodes = OPCODES
         for i in self.op[0]:
-            self.size_info.append(os.path.getsize(self.paths['db'] + 'bytecode/' + i + '.json'))
+            self.size_info.append(os.path.getsize(self.paths['db'] + 'ponzi/bcode/' + i + '.json'))
         for i in self.op[1]:
-            self.size_info.append(os.path.getsize(self.paths['db'] + 'bytecode_np/' + i + '.json'))
+            self.size_info.append(os.path.getsize(self.paths['db'] + 'non_ponzi/bcode/' + i + '.json'))
         with open(self.paths['db'] + 'op_freq.json', 'rb', ) as f:
             self.op_freq = json.loads(f.read())
         self.cur_time = tl.compute_time(self.cur_time)
@@ -115,6 +124,8 @@ class Feature:
 
     def cal_advanced_features(self):
         ft = []
+        ft_opcodes = []
+        ft_basic = []
         len_op = [len(self.op[0]), len(self.op[1])]
         for tr_index in range(2):
             print('computing features for ' + ('ponzi' if tr_index == 0 else 'non ponzi'))
@@ -146,8 +157,13 @@ class Feature:
                                          'time_in': np.asarray(time_in), 'time_out': np.asarray(time_out),
                                          'pay_in': pay_in, 'pay_out': pay_out, 'num_overlap_addr': num_overlap_addr})
                 ft.append(np.concatenate((res, np.asarray(self.op_freq[tr_index][i], dtype='float64'))))
+                ft_opcodes.append(np.concatenate((np.asarray(['ponzi' if tr_index == 0 else 'non_ponzi']),
+                                                  np.asarray(self.op_freq[tr_index][i], dtype='float64'))))
+                ft_basic.append(res)
             self.cur_time = tl.compute_time(self.cur_time)
         self.ft = ft
+        self.ft_opcodes = ft_opcodes
+        self.ft_basic = ft_basic
 
     @staticmethod
     def cal_value_time_in_out(args):
@@ -170,17 +186,17 @@ class Feature:
             args['addr_in'].add(tx['from'])
         return args['pay_in'], args['pay_out']
 
-    def create_pandas_dataframe(self):
+    def create_pandas_dataframe(self, ft, ft_names):
         print("Creating pandas dataframe...")
-        columns = [s + '@NUMERIC' for s in self.ft_names + self.opcodes]
+        columns = [s + '@NUMERIC' for s in ft_names]
         columns[0] = "ponzi@{ponzi,non_ponzi}"
-        df = pd.DataFrame(data=self.ft, columns=columns)
+        df = pd.DataFrame(data=ft, columns=columns)
         df['size_info@NUMERIC'] = self.size_info
         # data.loc[:, data.columns != columns[0]] = data.loc[:, data.columns != columns[0]].astype(np.float64)
         self.cur_time = tl.compute_time(self.cur_time)
-        self.df = df
-        self.get_rid_of_outliers(columns)
+        return df
 
+    # deprecated
     def get_rid_of_outliers(self, columns):
         print("Getting rid of outliers for the non ponzi instances")
         out_index = 3
@@ -203,8 +219,10 @@ class Feature:
         print("Dumping into arff files ...")
         with open(self.paths['db'] + 'models/PONZI_' + str(self.J) + '.arff', 'w') as f:
             a2p.dump(self.df, f)
-        with open(self.paths['db'] + 'models/PONZI_out_' + str(self.J) + '.arff', 'w') as f:
-            a2p.dump(self.df_out, f)
+        with open(self.paths['db'] + 'models/PONZI_opcodes_' + str(self.J) + '.arff', 'w') as f:
+            a2p.dump(self.df_opcodes, f)
+        with open(self.paths['db'] + 'models/PONZI_basic_' + str(self.J) + '.arff', 'w') as f:
+            a2p.dump(self.df_basic, f)
         self.cur_time = tl.compute_time(self.cur_time)
 
     def remaining_code(self):
