@@ -36,7 +36,7 @@ import os
 
 
 PATH = '../dataset/'
-DB = PATH + 'sm_database/{}.json'
+DB = PATH + 'sm_database/{}/'
 OPCODE_PATH = '/Users/charlesge/charles/university/Master_project/smart-ponzi-detection/dataset/non_ponzi/opcode/'
 
 
@@ -55,7 +55,7 @@ class EthCrawlerNormalTx:
         #     nml.close()
         addresses = self.addresses
         i = 0
-        while addresses[i] != '0x01f2acf2914860331c1cb1a9acecda7475e06af8':
+        while addresses[i] != '0x06012c8cf97bead5deae237070f9587f8e7a266d':
             i += 1
         self.addresses = addresses[i:]
         [self.crawl(addr) for addr in self.addresses]
@@ -74,9 +74,7 @@ class EthCrawlerNormalTx:
                 txs += data_one_page
                 page += 1
         print(f"len of txs: {len(txs)}")
-        with open(self.saved_file, 'a') as f:
-            f.write(addr + '\n')
-            f.write(json.dumps(txs).replace(" ", "") + "\n")
+        save_file(self.saved_file + addr, txs)
 
     @staticmethod
     def crawl_one_page(url):
@@ -130,9 +128,9 @@ class EthCrawlerInternalTx:
                 txs += data_one_page
                 page += 1
         print(f"len of txs: {len(txs)}")
-        with open(self.saved_file, 'a') as f:
+        with open(self.saved_file + addr + '.json', 'w') as f:
             f.write(addr + '\n')
-            f.write(json.dumps(txs).replace(" ", "") + '\n')
+            f.write(json.dumps(txs) + "\n")
 
     @staticmethod
     def crawl_one_page(url):
@@ -152,6 +150,20 @@ class EthCrawlerInternalTx:
             except Exception as e:
                 print("Error: ")
                 print(e)
+
+
+def save_file(path, data):
+    # path = '/xxx/xxx/xxx/addr' without '.json'
+    lens = data / 1000000
+    for index in range(lens):
+        file = f"{path}_{index}.json"
+        with open(file, 'w') as f:
+            start = index * 1000000
+            end = start + 1000000
+            f.write(json.dumps(data[start:end]))
+    file = f"{path}_{lens}.json"
+    with open(file, 'w') as f:
+        f.write(json.dumps(data[lens*1000000:]))
 
 
 if __name__ == '__main__':
