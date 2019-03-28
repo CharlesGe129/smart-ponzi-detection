@@ -31,51 +31,81 @@ import requests
 import csv
 import ast
 import json
+import os
 
 
 
 PATH = '../dataset/'
 DB = PATH + 'sm_database/{}.json'
+OPCODE_PATH = '/Users/charlesge/charles/university/Master_project/smart-ponzi-detection/dataset/non_ponzi/opcode/'
 
 
 class EthCrawlerNormalTx:
-    def __init__(self, addresses, saved_file):
+    def __init__(self, addresses, saved_file, revert_dict):
         self.name = "crawler_nml"
-        self.addresses = addresses
+        self.addresses = sorted(addresses)
         self.addr_len = len(addresses)
         self.saved_file = saved_file
-        self.url_nml_pattern = 'http://api.etherscan.io/api?module=account&action=txlist&address={0}&startblock=0&endblock=99999999&sort=asc&apikey=APIbirthday'
+        self.url_nml_pattern = 'http://api.etherscan.io/api?module=account&action=txlist&address={0}&startblock=0&endblock=99999999&sort=asc&apikey=APIbirthday&page={1}&offset=10000'
         self.count = 0
+        self.revert_dict = revert_dict
 
     def start(self):
         # with open(self.saved_file, 'w') as nml:
         #     nml.close()
+        addresses = self.addresses
+        i = 0
+        while addresses[i] != '0x01f2acf2914860331c1cb1a9acecda7475e06af8':
+            i += 1
+        self.addresses = addresses[i:]
         [self.crawl(addr) for addr in self.addresses]
 
     def crawl(self, addr):
         self.count += 1
-        print(addr + ', progress: ' + str(round(self.count/self.addr_len*100, 2)) + '%')
+        page = 1
+        txs = []
+        while True:
+            url = self.url_nml_pattern.format(addr, page)
+            print(f"{addr}, page={page}, progress:{round(self.count / self.addr_len * 100, 2)}%, num_txs={len(txs)}")
+            data_one_page = self.crawl_one_page(url)
+            if not data_one_page:
+                break
+            else:
+                txs += data_one_page
+                page += 1
+        print(f"len of txs: {len(txs)}")
+        with open(self.saved_file, 'a') as f:
+            f.write(addr + '\n')
+            f.write(json.dumps(txs).replace(" ", "") + "\n")
+
+    @staticmethod
+    def crawl_one_page(url):
         while True:
             try:
-                url = self.url_nml_pattern.format(addr)
                 response = requests.get(url)
-                break
+                data = json.loads(response.text)
+                if 'result' not in data:
+                    print(f"error, no result {url}")
+                    return []
+                # {"status":"0","message":"No transactions found","result":[]}
+                if len(data['result']) == 0:
+                    return []
+                else:
+                    return data['result']
             except Exception as e:
                 print("Error: ")
                 print(e)
-        with open(self.saved_file, 'a') as f:
-            f.write(addr + '\n')
-            f.write(response.text[38:-1] + '\n')
 
 
 class EthCrawlerInternalTx:
-    def __init__(self, addresses, saved_file):
+    def __init__(self, addresses, saved_file, revert_dict):
         self.name = "crawler_nml"
-        self.addresses = addresses
+        self.addresses = sorted(addresses)
         self.addr_len = len(addresses)
         self.saved_file = saved_file
-        self.url_nml_pattern = 'http://api.etherscan.io/api?module=account&action=txlistinternal&address={0}&startblock=0&endblock=9999999&sort=asc&apikey=APIbirthday'
+        self.url_nml_pattern = 'http://api.etherscan.io/api?module=account&action=txlistinternal&address={0}&startblock=0&endblock=9999999&sort=asc&apikey=APIbirthday&page={1}&offset=10000'
         self.count = 0
+        self.revert_dict = revert_dict
 
     def start(self):
         # with open(self.saved_file, 'w') as int:
@@ -84,28 +114,64 @@ class EthCrawlerInternalTx:
 
     def crawl(self, addr):
         self.count += 1
-        print(addr + ', progress: ' + str(round(self.count/self.addr_len*100, 2)) + '%')
+        page = 1
+        txs = []
+        if addr not in self.revert_dict:
+            print(f"Error: addr={addr}")
+        elif self.revert_dict[addr]:
+            return
+        while True:
+            url = self.url_nml_pattern.format(addr, page)
+            print(f"{addr}, page={page}, progress:{round(self.count / self.addr_len * 100, 2)}%, num_txs={len(txs)}")
+            data_one_page = self.crawl_one_page(url)
+            if not data_one_page:
+                break
+            else:
+                txs += data_one_page
+                page += 1
+        print(f"len of txs: {len(txs)}")
+        with open(self.saved_file, 'a') as f:
+            f.write(addr + '\n')
+            f.write(json.dumps(txs).replace(" ", "") + '\n')
+
+    @staticmethod
+    def crawl_one_page(url):
         while True:
             try:
-                url = self.url_nml_pattern.format(addr)
                 response = requests.get(url)
-                break
+                data = json.loads(response.text)
+                if 'result' not in data:
+                    print(f"error, no result {url}")
+                    return []
+                # {"status":"0","message":"No transactions found","result":[]}
+                if len(data['result']) == 0:
+                    print("End")
+                    return []
+                else:
+                    return data['result']
             except Exception as e:
                 print("Error: ")
                 print(e)
-        with open(self.saved_file, 'a') as f:
-            f.write(addr + "\n")
-            f.write(response.text[38:-1] + '\n' if response.text[25:27] == 'OK' else '[]\n')
 
 
 if __name__ == '__main__':
-    files = ['ponzi_collection.csv', 'non_ponzi_collection.csv']
+    # Check if NP contracts have "REVERT" in OPCODE. Ignore contracts contain "REVERT" during downloads.
+    revert = {}
+    for filename in os.listdir(OPCODE_PATH):
+        if not filename.endswith(".json"):
+            continue
+        with open(OPCODE_PATH + filename) as f:
+            revert[filename.split(".json")[0]] = 'REVERT' in f.read()
+
+    # crawling
+    # files = ['ponzi_collection.csv', 'non_ponzi_collection.csv']
+    files = ['non_ponzi_collection.csv']
     for pz_file in files:
         with open(PATH + pz_file, 'rt') as f:
             csv_data = list(csv.reader(f))
         addr_index = 2 if pz_file.startswith('ponzi') else 0
         addresses = [line[addr_index].split(',')[0].split(' ')[0] for line in csv_data[1:]]
         saved_file = DB.format('normal' if pz_file.startswith('ponzi') else 'normal_np')
-        EthCrawlerNormalTx(addresses, saved_file).start()
+        EthCrawlerNormalTx(addresses, saved_file, revert).start()
         saved_file = DB.format('internal' if pz_file.startswith('ponzi') else 'internal_np')
-        EthCrawlerInternalTx(addresses, saved_file).start()
+        EthCrawlerInternalTx(addresses, saved_file, revert).start()

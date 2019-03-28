@@ -109,3 +109,7 @@ venv.bak/
 dataset
 Marion_files
 *.tar
+sm_database_old
+sm_database
+ponzi
+non_ponzi
