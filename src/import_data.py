@@ -64,6 +64,10 @@ class EthCrawlerNormalTx:
         self.count += 1
         page = 1
         txs = []
+        if addr not in self.revert_dict:
+            print(f"Error: addr={addr}")
+        elif self.revert_dict[addr]:
+            return
         while True:
             url = self.url_nml_pattern.format(addr, page)
             print(f"{addr}, page={page}, progress:{round(self.count / self.addr_len * 100, 2)}%, num_txs={len(txs)}")
@@ -114,6 +118,10 @@ class EthCrawlerInternalTx:
         self.count += 1
         page = 1
         txs = []
+        if addr not in self.revert_dict:
+            print(f"Error: addr={addr}")
+        elif self.revert_dict[addr]:
+            return
         while True:
             url = self.url_nml_pattern.format(addr, page)
             print(f"{addr}, page={page}, progress:{round(self.count / self.addr_len * 100, 2)}%, num_txs={len(txs)}")
