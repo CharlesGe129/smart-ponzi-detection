@@ -55,7 +55,7 @@ class EthCrawlerNormalTx:
         #     nml.close()
         addresses = self.addresses
         i = 0
-        while addresses[i] != '0x06012c8cf97bead5deae237070f9587f8e7a266d':
+        while addresses[i] != '0x2a0c0dbecc7e4d658f48e01e3fa353f44050c208':
             i += 1
         self.addresses = addresses[i:]
         [self.crawl(addr) for addr in self.addresses]
@@ -78,9 +78,9 @@ class EthCrawlerNormalTx:
 
     @staticmethod
     def crawl_one_page(url):
-        while True:
+        for i in range(3):
             try:
-                response = requests.get(url)
+                response = requests.get(url, timeout=20)
                 data = json.loads(response.text)
                 if 'result' not in data:
                     print(f"error, no result {url}")
@@ -114,10 +114,6 @@ class EthCrawlerInternalTx:
         self.count += 1
         page = 1
         txs = []
-        if addr not in self.revert_dict:
-            print(f"Error: addr={addr}")
-        elif self.revert_dict[addr]:
-            return
         while True:
             url = self.url_nml_pattern.format(addr, page)
             print(f"{addr}, page={page}, progress:{round(self.count / self.addr_len * 100, 2)}%, num_txs={len(txs)}")
@@ -128,15 +124,14 @@ class EthCrawlerInternalTx:
                 txs += data_one_page
                 page += 1
         print(f"len of txs: {len(txs)}")
-        with open(self.saved_file + addr + '.json', 'w') as f:
-            f.write(addr + '\n')
-            f.write(json.dumps(txs) + "\n")
+        save_file(self.saved_file + addr, txs)
 
     @staticmethod
     def crawl_one_page(url):
-        while True:
+        for i in range(3):
             try:
-                response = requests.get(url)
+                response = requests.get(url, timeout=20)
+                a = requests.get(url, )
                 data = json.loads(response.text)
                 if 'result' not in data:
                     print(f"error, no result {url}")
@@ -154,7 +149,7 @@ class EthCrawlerInternalTx:
 
 def save_file(path, data):
     # path = '/xxx/xxx/xxx/addr' without '.json'
-    lens = data / 1000000
+    lens = int(len(data) / 1000000)
     for index in range(lens):
         file = f"{path}_{index}.json"
         with open(file, 'w') as f:
@@ -177,6 +172,7 @@ if __name__ == '__main__':
 
     # crawling
     # files = ['ponzi_collection.csv', 'non_ponzi_collection.csv']
+    # files = ['ponzi_collection.csv']
     files = ['non_ponzi_collection.csv']
     for pz_file in files:
         with open(PATH + pz_file, 'rt') as f:
