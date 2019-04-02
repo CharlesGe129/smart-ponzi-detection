@@ -18,6 +18,16 @@ class EtherDataToFreqAndTrDisc:
         self.paths = dict()
         self.op = list()
         self.opcodes = list()
+        self.revert = dict()
+
+    def start(self):
+        self.define_path()
+        self.load_if_revert()
+        # self.gen_op_counts()
+        self.load_op()
+        self.gen_op_freq()
+        # self.gen_op_freq_origin()
+        # self.gen_tr_dico()
 
     def define_path(self):
         self.cur_time = time.clock()
@@ -32,17 +42,31 @@ class EtherDataToFreqAndTrDisc:
         self.paths['database_int_np'] = self.paths['db'] + 'sm_database/internal_np.json'
         self.paths['database_op_np'] = self.paths['db'] + 'non_ponzi/op_count/'
 
+        self.paths['opcode'] = self.paths['db'] + 'ponzi/opcode/'
+        self.paths['opcode_np'] = self.paths['db'] + 'non_ponzi/opcode/'
+
         # # For original data Marion_files
         # self.paths['db'] = '../dataset/sm_database/'
         # self.paths['database_op'] = self.paths['db'] + 'opcode/opcodes_count/'
         # self.paths['database_op_np'] = self.paths['db'] + 'opcode_np/opcode_count/bytecode_np/'
 
         self.cur_time = tl.compute_time(self.cur_time)
+        pass
+
+    def load_if_revert(self):
+        revert = {}
+        for directory in ['opcode', 'opcode_np']:
+            for filename in os.listdir(self.paths[directory]):
+                if not filename.endswith(".json"):
+                    continue
+                with open(self.paths[directory] + filename) as f:
+                    revert[filename.split(".json")[0]] = 'REVERT' in f.read()
+        self.revert = revert
 
     def load_op(self):
         self.op = [
-            [fname.split('.csv')[0] for fname in os.listdir(self.paths['database_op']) if fname.endswith('.csv')],
-            [fname.split('.csv')[0] for fname in os.listdir(self.paths['database_op_np']) if fname.endswith('.csv')]
+            sorted([fname.split('.csv')[0] for fname in os.listdir(self.paths['database_op']) if fname.endswith('.csv') and not self.revert[fname.split('.csv')[0]]]),
+            sorted([fname.split('.csv')[0] for fname in os.listdir(self.paths['database_op_np']) if fname.endswith('.csv') and not self.revert[fname.split('.csv')[0]]])
         ]
         print("op length: " + str(len(self.op[0])) + ", " + str(len(self.op[1])))
         self.opcodes = OPCODES
@@ -89,7 +113,8 @@ class EtherDataToFreqAndTrDisc:
 
     def gen_op_freq(self):
         print("EtherDataToFreqAndTrDisc: generating op_freq.json")
-        op_freq = [[], []]
+        op_freq = [{}, {}]
+        # op_freq = [[], []]
         for i in range(2):
             db_path = self.paths['database_op'] if i == 0 else self.paths['database_op_np']
             for addr in self.op[i]:
@@ -106,11 +131,12 @@ class EtherDataToFreqAndTrDisc:
                             res[self.opcodes.index(code)] += count
                     tot = tot if len(raw) > 1 else 1
                     res = [x / tot for x in res]
-                    op_freq[i].append(res)
+                    op_freq[i][addr] = res
+                    # op_freq[i].append(res)
 
         print(f"{len(op_freq[0])}, {len(op_freq[1])}")
         self.cur_time = tl.compute_time(self.cur_time)
-        with open(self.paths['db'] + 'op_freq.json', 'w') as outfile:
+        with open(self.paths['db'] + 'op_freq_list.json', 'w') as outfile:
             outfile.write(json.dumps(op_freq))
             print('op_freq serialized')
 
@@ -195,14 +221,6 @@ class EtherDataToFreqAndTrDisc:
         with open(self.paths['db'] + 'op_freq.json', 'w') as outfile:
             outfile.write(json.dumps(op_freq))
             print('op_freq serialized')
-
-    def start(self):
-        self.define_path()
-        self.gen_op_counts()
-        self.load_op()
-        # self.gen_op_freq_origin()
-        self.gen_op_freq()
-        # self.gen_tr_dico()
 
 
 if __name__ == '__main__':

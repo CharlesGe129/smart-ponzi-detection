@@ -27,8 +27,8 @@ from arff2pandas import a2p
 from scipy import stats
 import json
 import time
-from sklearn import preprocessing
-import matplotlib.pyplot as plt
+# from sklearn import preprocessing
+# import matplotlib.pyplot as plt
 from src.open_data import OPCODES
 
 
@@ -49,28 +49,34 @@ class Feature:
         self.df = None
         self.df_opcodes = None
         self.df_basic = None
+        self.revert = dict()
 
     def start(self):
         self.define_path()
+        self.load_if_revert()
         self.load_op()
-        self.load_tr_dico()
+        # self.load_tr_dico()
+        self.load_txs_data()
         self.compute_feature()
-        self.df = self.create_pandas_dataframe(self.ft, self.ft_names + self.opcodes)
-        self.df_opcodes = self.create_pandas_dataframe(self.ft_opcodes, ['ponzi'] + self.opcodes)
-        self.df_basic = self.create_pandas_dataframe(self.ft_basic, self.ft_names)
-        self.dump_arff()
+        # self.df = self.create_pandas_dataframe(self.ft, self.ft_names + self.opcodes)
+        # self.df_opcodes = self.create_pandas_dataframe(self.ft_opcodes, ['ponzi'] + self.opcodes)
+        # self.df_basic = self.create_pandas_dataframe(self.ft_basic, self.ft_names)
+        # self.dump_arff()
 
     def define_path(self):
         print("Feature: define variable and load data")
         self.paths['db'] = '../dataset/'
 
-        self.paths['database_nml'] = self.paths['db'] + 'normal.json'
-        self.paths['database_int'] = self.paths['db'] + 'internal.json'
+        self.paths['database_nml'] = self.paths['db'] + 'sm_database/normal/'
+        self.paths['database_int'] = self.paths['db'] + 'sm_database/internal/'
         self.paths['database_op'] = self.paths['db'] + 'ponzi/op_count/'
 
-        self.paths['database_nml_np'] = self.paths['db'] + 'normal_np.json'
-        self.paths['database_int_np'] = self.paths['db'] + 'internal_np.json'
+        self.paths['database_nml_np'] = self.paths['db'] + 'sm_database/normal_np/'
+        self.paths['database_int_np'] = self.paths['db'] + 'sm_database/internal_np/'
         self.paths['database_op_np'] = self.paths['db'] + 'non_ponzi/op_count/'
+
+        self.paths['opcode'] = self.paths['db'] + 'ponzi/opcode/'
+        self.paths['opcode_np'] = self.paths['db'] + 'non_ponzi/opcode/'
 
         # # For original data Marion_files
         # self.paths['db'] = '../dataset/sm_database/'
@@ -78,23 +84,58 @@ class Feature:
         # self.paths['database_op_np'] = self.paths['db'] + 'opcode_np/opcode_count/bytecode_np/'
 
         self.cur_time = tl.compute_time(self.cur_time)
-        pass
+
+    def load_if_revert(self):
+        revert = {}
+        for directory in ['opcode', 'opcode_np']:
+            for filename in os.listdir(self.paths[directory]):
+                if not filename.endswith(".json"):
+                    continue
+                with open(self.paths[directory] + filename) as f:
+                    revert[filename.split(".json")[0]] = 'REVERT' in f.read()
+        self.revert = revert
 
     def load_op(self):
         # op[p=0, np=1][index] = contract_address
         print("Loading op, opcodes, op_freq, size_info...")
         self.op = [
-            [fname.split('.csv')[0] for fname in os.listdir(self.paths['database_op']) if fname.endswith('.csv')],
-            [fname.split('.csv')[0] for fname in os.listdir(self.paths['database_op_np']) if fname.endswith('.csv')]
+            sorted([fname.split('.csv')[0] for fname in os.listdir(self.paths['database_op']) if
+                    fname.endswith('.csv') and not self.revert[fname.split('.csv')[0]]]),
+            sorted([fname.split('.csv')[0] for fname in os.listdir(self.paths['database_op_np']) if
+                    fname.endswith('.csv') and not self.revert[fname.split('.csv')[0]]])
         ]
         self.opcodes = OPCODES
         for i in self.op[0]:
             self.size_info.append(os.path.getsize(self.paths['db'] + 'ponzi/bcode/' + i + '.json'))
         for i in self.op[1]:
             self.size_info.append(os.path.getsize(self.paths['db'] + 'non_ponzi/bcode/' + i + '.json'))
-        with open(self.paths['db'] + 'op_freq.json', 'rb', ) as f:
-            self.op_freq = json.loads(f.read())
+        self.load_op_freq()
+        # Do some statistics
+        print(len(self.op_freq))
+        print(len(self.op_freq[0]))
+        print(len(self.op_freq[0][0]))
+        print(len(OPCODES))
+        for tr_index in range(2):
+            print(f"avg of {'Ponzi' if tr_index == 0 else 'Non-Ponzi'}")
+            nums = [[] for i in range(50)]
+            for contract in self.op_freq[tr_index]:
+                for i in range(50):
+                    nums[i].append(float(contract[i]))
+            for i in range(50):
+                print(f"{OPCODES[i]}: {sum(nums[i]) / len(nums[i])}")
+        # End doing some statistics
         self.cur_time = tl.compute_time(self.cur_time)
+
+    def load_op_freq(self):
+        # # old
+        # with open(self.paths['db'] + 'op_freq_list.json', 'rb', ) as f:
+        #     temp_op_freq = json.loads(f.read())
+        with open(self.paths['db'] + 'op_freq.json', 'rb', ) as f:
+            op_freq_dict = json.loads(f.read())
+        self.op_freq = [[], []]
+        for np_index in range(2):
+            for addr in self.op[np_index]:
+                self.op_freq[np_index].append(op_freq_dict[np_index][addr])
 
     def load_tr_dico(self):
         # tr_dico[p=0, np=1][# of Contracts][nml=0, int=1][list of TXs in nml.json] = {'blockNumber': xxx} = dict()
@@ -112,6 +153,33 @@ class Feature:
         self.tr_dico = tr_dico
         self.cur_time = tl.compute_time(self.cur_time)
 
+    def load_txs_data(self):
+        self.tr_dico = [[[[], []] for i in range(len(self.op[0]))], [[[], []] for i in range(len(self.op[1]))]]
+        # tr_dico[p=0, np=1][# of Contracts][nml=0, int=1][list of TXs in nml.json] = {'blockNumber': xxx} = dict()
+        self.load_txs_data_one_directory(self.paths['database_nml'], 0, 0)
+        self.load_txs_data_one_directory(self.paths['database_int'], 0, 1)
+        self.load_txs_data_one_directory(self.paths['database_nml_np'], 1, 0)
+        self.load_txs_data_one_directory(self.paths['database_int_np'], 1, 1)
+
+    def load_txs_data_one_directory(self, path, np_index, nml_index):
+        # self.op[p=0, np=1][index] = contract_address
+        for i in range(len(self.op[np_index])):
+            contract_addr = self.op[np_index][i]
+            print(f"contract_addr={contract_addr}")
+            data = []
+            if not self.revert[contract_addr]:
+                try:
+                    file_index = 0
+                    while True:
+                        print(f"Try load {contract_addr}_{file_index}.json")
+                        with open(f"{path}{contract_addr}_{file_index}.json") as f:
+                            data += json.loads(f.read())
+                        file_index += 1
+                except FileNotFoundError as e:
+                    pass
+            self.tr_dico[np_index][i][nml_index] = data
+            print(f"data_len={len(data)}, tr_dico[{np_index}][{i}][{nml_index}] = data")
+
     def compute_feature(self):
         print("computing features for ponzi...")
         self.ft_names = [# 'addr',
@@ -127,6 +195,8 @@ class Feature:
         ft_opcodes = []
         ft_basic = []
         len_op = [len(self.op[0]), len(self.op[1])]
+        nbrs = [[], []]
+        lifes = [[], []]
         for tr_index in range(2):
             print('computing features for ' + ('ponzi' if tr_index == 0 else 'non ponzi'))
             for i in range(len_op[tr_index]):
@@ -156,6 +226,16 @@ class Feature:
                                          'val_in': np.asarray(val_in), 'val_out': np.asarray(val_out),
                                          'time_in': np.asarray(time_in), 'time_out': np.asarray(time_out),
                                          'pay_in': pay_in, 'pay_out': pay_out, 'num_overlap_addr': num_overlap_addr})
+                # gini: 12 in 13 out 15 timeout
+                # 1 nbr_tx_in, 16 lifetime
+                # CALLDATACOPY, CODECOPY, SWAP3, SSTORE, DUP6, SWAP6, REVERT, SSTORE
+                nbrs[tr_index].append(float(res[1]))
+                lifes[tr_index].append(float(res[16]))
+                # if lifetime in lifes[tr_index]:
+                #     lifes[tr_index][lifetime] += 1
+                # else:
+                #     lifes[tr_index][lifetime] = 1
+
                 ft.append(np.concatenate((res, np.asarray(self.op_freq[tr_index][i], dtype='float64'))))
                 ft_opcodes.append(np.concatenate((np.asarray(['ponzi' if tr_index == 0 else 'non_ponzi']),
                                                   np.asarray(self.op_freq[tr_index][i], dtype='float64'))))
@@ -164,6 +244,10 @@ class Feature:
         self.ft = ft
         self.ft_opcodes = ft_opcodes
         self.ft_basic = ft_basic
+        print("nbrs==========================")
+        print(f"P={sum(nbrs[0]) / len(nbrs[0])}, NP={sum(nbrs[1]) / len(nbrs[1])}")
+        print("lifes==========================")
+        print(f"P={sum(lifes[0]) / len(lifes[0])}, NP={sum(lifes[1]) / len(lifes[1])}")
 
     @staticmethod
     def cal_value_time_in_out(args):
@@ -277,6 +361,7 @@ class Feature:
 
         value = 10**18 ETH value
         """
+
 
 if __name__ == '__main__':
     Feature().start()
