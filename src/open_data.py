@@ -8,7 +8,7 @@ import src.tools as tl
 OPCODES = ['SWAP8', 'DUP11', 'DUP14', 'SWAP10', 'DUP15', 'LOG2', 'INVALID', 'SWAP9', 'SWAP5', 'SWAP12', 'SWAP16',
            'DUP9', 'LOG1', 'DUP12', 'SWAP11', 'SWAP2', 'MSTORE8', 'SWAP14', 'DUP13', 'POP', 'DUP8','DUP7',
            'DUP3', 'DUP4', 'MSTORE', 'SWAP3', 'CODECOPY', 'JUMP', 'DUP5', 'SWAP13', 'STOP', 'CALLDATACOPY', 'SWAP7',
-           'SWAP1', 'SWAP6', 'RETURN', 'DUP6', 'SWAP4', 'REVERT', 'SELFDESTRUCT', 'DUP10', 'DUP16', 'JUMPI',
+           'SWAP1', 'SWAP6', 'RETURN', 'DUP6', 'SWAP4', 'SELFDESTRUCT', 'DUP10', 'DUP16', 'JUMPI',
            'SSTORE', 'PUSH', 'LOG3', 'LOG4', 'Missing', 'SWAP15', 'DUP1&2']
 
 
@@ -23,7 +23,7 @@ class EtherDataToFreqAndTrDisc:
     def start(self):
         self.define_path()
         self.load_if_revert()
-        # self.gen_op_counts()
+        self.gen_op_counts()
         self.load_op()
         self.gen_op_freq()
         # self.gen_op_freq_origin()
@@ -65,8 +65,8 @@ class EtherDataToFreqAndTrDisc:
 
     def load_op(self):
         self.op = [
-            sorted([fname.split('.csv')[0] for fname in os.listdir(self.paths['database_op']) if fname.endswith('.csv') and not self.revert[fname.split('.csv')[0]]]),
-            sorted([fname.split('.csv')[0] for fname in os.listdir(self.paths['database_op_np']) if fname.endswith('.csv') and not self.revert[fname.split('.csv')[0]]])
+            sorted([fname.split('.json')[0] for fname in os.listdir(self.paths['opcode']) if fname.endswith('.json') and not self.revert[fname.split('.json')[0]]]),
+            sorted([fname.split('.json')[0] for fname in os.listdir(self.paths['opcode_np']) if fname.endswith('.json') and not self.revert[fname.split('.json')[0]]])
         ]
         print("op length: " + str(len(self.op[0])) + ", " + str(len(self.op[1])))
         self.opcodes = OPCODES
@@ -76,7 +76,8 @@ class EtherDataToFreqAndTrDisc:
                         self.paths['database_op_np'].replace('op_count', 'opcode')]
         output_path = [self.paths['database_op'], self.paths['database_op_np']]
         i = 0
-        for op_index in range(2):
+        # for op_index in range(2):
+        for op_index in range(1):
             for filename in os.listdir(opcode_paths[op_index]):
                 i += 1
                 print(f"{i}, {filename}")
@@ -136,7 +137,7 @@ class EtherDataToFreqAndTrDisc:
 
         print(f"{len(op_freq[0])}, {len(op_freq[1])}")
         self.cur_time = tl.compute_time(self.cur_time)
-        with open(self.paths['db'] + 'op_freq_list.json', 'w') as outfile:
+        with open(self.paths['db'] + 'op_freq.json', 'w') as outfile:
             outfile.write(json.dumps(op_freq))
             print('op_freq serialized')
 

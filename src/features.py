@@ -27,6 +27,9 @@ from arff2pandas import a2p
 from scipy import stats
 import json
 import time
+import datetime
+import statistics
+import src.cal_txs_creation_block as cal_contract_creation_blocks
 # from sklearn import preprocessing
 # import matplotlib.pyplot as plt
 from src.open_data import OPCODES
@@ -40,6 +43,7 @@ class Feature:
         self.opcodes = list()
         self.J = 100000
         self.tr_dico = list()
+        self.tr_dico_all = list()
         self.size_info = list()
         self.op_freq = dict()
         self.ft_names = list()
@@ -50,18 +54,26 @@ class Feature:
         self.df_opcodes = None
         self.df_basic = None
         self.revert = dict()
+        self.contract_creation_block = dict()
+        self.top_30_avg_stdev = ''
 
-    def start(self):
+    def start(self, days):
         self.define_path()
         self.load_if_revert()
         self.load_op()
         # self.load_tr_dico()
         self.load_txs_data()
-        self.compute_feature()
-        # self.df = self.create_pandas_dataframe(self.ft, self.ft_names + self.opcodes)
-        # self.df_opcodes = self.create_pandas_dataframe(self.ft_opcodes, ['ponzi'] + self.opcodes)
-        # self.df_basic = self.create_pandas_dataframe(self.ft_basic, self.ft_names)
-        # self.dump_arff()
+        self.load_contract_creation_block()
+        while True:
+            # self.filter_txs_by_block(days)
+            self.tr_dico = self.tr_dico_all
+            self.compute_feature()
+            self.df = self.create_pandas_dataframe(self.ft, self.ft_names + self.opcodes)
+            self.df_opcodes = self.create_pandas_dataframe(self.ft_opcodes, ['ponzi'] + self.opcodes)
+            self.df_basic = self.create_pandas_dataframe(self.ft_basic, self.ft_names)
+            self.dump_arff(days)
+            return
+            days += 1
 
     def define_path(self):
         print("Feature: define variable and load data")
@@ -77,6 +89,8 @@ class Feature:
 
         self.paths['opcode'] = self.paths['db'] + 'ponzi/opcode/'
         self.paths['opcode_np'] = self.paths['db'] + 'non_ponzi/opcode/'
+
+        self.paths['arff'] = self.paths['db'] + f'models/filter_tx_per_day/'
 
         # # For original data Marion_files
         # self.paths['db'] = '../dataset/sm_database/'
@@ -111,20 +125,24 @@ class Feature:
             self.size_info.append(os.path.getsize(self.paths['db'] + 'non_ponzi/bcode/' + i + '.json'))
         self.load_op_freq()
         # Do some statistics
-        print(len(self.op_freq))
-        print(len(self.op_freq[0]))
-        print(len(self.op_freq[0][0]))
-        print(len(OPCODES))
-        for tr_index in range(2):
-            print(f"avg of {'Ponzi' if tr_index == 0 else 'Non-Ponzi'}")
-            nums = [[] for i in range(50)]
-            for contract in self.op_freq[tr_index]:
-                for i in range(50):
-                    nums[i].append(float(contract[i]))
-            for i in range(50):
-                print(f"{OPCODES[i]}: {sum(nums[i]) / len(nums[i])}")
+        # print(len(self.op_freq))
+        # print(len(self.op_freq[0]))
+        # print(len(self.op_freq[0][0]))
+        # print(len(OPCODES))
+        # for tr_index in range(2):
+        #     print(f"avg of {'Ponzi' if tr_index == 0 else 'Non-Ponzi'}")
+        #     nums = [[] for i in range(len(OPCODES))]
+        #     for contract in self.op_freq[tr_index]:
+        #         for i in range(len(OPCODES)):
+        #             nums[i].append(float(contract[i]))
+        #     for i in range(len(OPCODES)):
+        #         print(f"{OPCODES[i]}: {sum(nums[i]) / len(nums[i])}")
         # End doing some statistics
-        self.cur_time = tl.compute_time(self.cur_time)
+        tl.compute_time(self.cur_time)
+
+    def load_contract_creation_block(self):
+        print("Loading load_contract_creation_block")
+        self.contract_creation_block = cal_contract_creation_blocks.start(self.paths['db'] + "sm_database/")
 
     def load_op_freq(self):
         # # old
@@ -137,24 +155,8 @@ class Feature:
             for addr in self.op[np_index]:
                 self.op_freq[np_index].append(op_freq_dict[np_index][addr])
 
-    def load_tr_dico(self):
-        # tr_dico[p=0, np=1][# of Contracts][nml=0, int=1][list of TXs in nml.json] = {'blockNumber': xxx} = dict()
-        tr_dico = [[], []]
-        with open(self.paths['db'] + 'tr_dico_ponzi.json', 'rb') as f:
-            tr_dico[0] = json.loads(f.read())
-
-        with open(self.paths['db'] + 'tr_dico_nonponzi0.json', 'rb') as f:
-            tr_dico[1] = json.loads(f.read())
-            print("Reading tr_dico: " + str(len(tr_dico[1])))
-        for i in range(1, len(self.op[1])//500 + 1):
-            with open(self.paths['db'] + 'tr_dico_nonponzi' + str(i) + '.json', 'rb') as f:
-                tr_dico[1] += json.loads(f.read())
-                print("Reading tr_dico: " + str(len(tr_dico[1])))
-        self.tr_dico = tr_dico
-        self.cur_time = tl.compute_time(self.cur_time)
-
     def load_txs_data(self):
-        self.tr_dico = [[[[], []] for i in range(len(self.op[0]))], [[[], []] for i in range(len(self.op[1]))]]
+        self.tr_dico_all = [[[[], []] for i in range(len(self.op[0]))], [[[], []] for i in range(len(self.op[1]))]]
         # tr_dico[p=0, np=1][# of Contracts][nml=0, int=1][list of TXs in nml.json] = {'blockNumber': xxx} = dict()
         self.load_txs_data_one_directory(self.paths['database_nml'], 0, 0)
         self.load_txs_data_one_directory(self.paths['database_int'], 0, 1)
@@ -165,20 +167,45 @@ class Feature:
         # self.op[p=0, np=1][index] = contract_address
         for i in range(len(self.op[np_index])):
             contract_addr = self.op[np_index][i]
-            print(f"contract_addr={contract_addr}")
+            # print(f"contract_addr={contract_addr}")
             data = []
             if not self.revert[contract_addr]:
                 try:
                     file_index = 0
                     while True:
-                        print(f"Try load {contract_addr}_{file_index}.json")
+                        # print(f"Try load {contract_addr}_{file_index}.json")
                         with open(f"{path}{contract_addr}_{file_index}.json") as f:
                             data += json.loads(f.read())
                         file_index += 1
                 except FileNotFoundError as e:
                     pass
-            self.tr_dico[np_index][i][nml_index] = data
-            print(f"data_len={len(data)}, tr_dico[{np_index}][{i}][{nml_index}] = data")
+            self.tr_dico_all[np_index][i][nml_index] = data
+            # print(f"data_len={len(data)}, tr_dico[{np_index}][{i}][{nml_index}] = data")
+        tl.compute_time(self.cur_time)
+
+    def filter_txs_by_block(self, days):
+        # tr_dico[p=0, np=1][# of Contracts][nml=0, int=1][list of TXs in nml.json] = {'blockNumber': xxx} = dict()
+        NUM_BLOCK_PER_DAY = 6*60*24
+        tr_dico = [[[[], []] for i in range(len(self.op[0]))], [[[], []] for i in range(len(self.op[1]))]]
+        count_txs = 0
+        for np_index in range(2):
+            i = 0
+            for contract_index in range(len(self.tr_dico_all[np_index])):
+                i += 1
+                # print(f"Filtering txs, np_index={np_index}, count={i}, process={round(i * 100 / len(self.op[np_index]), 2)}%")
+                for nml_index in range(2):
+                    data = []
+                    for tx_dict in self.tr_dico_all[np_index][contract_index][nml_index]:
+                        tx_block = int(tx_dict['blockNumber'])
+                        contract_addr = self.op[np_index][contract_index]
+                        creation_block = self.contract_creation_block[contract_addr]
+                        if tx_block - creation_block < NUM_BLOCK_PER_DAY * days:
+                            data.append(tx_dict)
+                            count_txs += 1
+                    tr_dico[np_index][contract_index][nml_index] = data
+        self.tr_dico = tr_dico
+        tl.compute_time(self.cur_time)
+        print(f"days={days}, num_txs={count_txs}")
 
     def compute_feature(self):
         print("computing features for ponzi...")
@@ -197,6 +224,7 @@ class Feature:
         len_op = [len(self.op[0]), len(self.op[1])]
         nbrs = [[], []]
         lifes = [[], []]
+        top_30_avg_stdev = [{'size_info': [], 'nbr_tx_in': [], 'lifetime': [], 'num_paid_in_addr': [], 'gini_in': [], 'overlap_in_out_addr': [], 'gini_time_out': [], 'avg_time_btw_tx': []}, {'size_info': [], 'nbr_tx_in': [], 'lifetime': [], 'num_paid_in_addr': [], 'gini_in': [], 'overlap_in_out_addr': [], 'gini_time_out': [], 'avg_time_btw_tx': []}]
         for tr_index in range(2):
             print('computing features for ' + ('ponzi' if tr_index == 0 else 'non ponzi'))
             for i in range(len_op[tr_index]):
@@ -209,6 +237,8 @@ class Feature:
                 pay_out = 0
                 addr_in = set()
                 addr_out = set()
+                # The timeStamp of all nml TXs is sorted asc, so the first normal TX is the TX creates the contract.
+                # That's from Charles. I checked the timeStamps of all nml TXs, and they were asc sorted.
                 birth = float(self.tr_dico[tr_index][i][0][0]['timeStamp'])
                 for tx in self.tr_dico[tr_index][i][0] + self.tr_dico[tr_index][i][1]:
                     # for each tx of that contract
@@ -236,18 +266,39 @@ class Feature:
                 # else:
                 #     lifes[tr_index][lifetime] = 1
 
+                top_30_avg_stdev[tr_index]['nbr_tx_in'].append(res[1])
+                top_30_avg_stdev[tr_index]['lifetime'].append(res[16])
+                top_30_avg_stdev[tr_index]['num_paid_in_addr'].append(res[5])
+                top_30_avg_stdev[tr_index]['gini_in'].append(res[12])
+                top_30_avg_stdev[tr_index]['overlap_in_out_addr'].append(res[7])
+                top_30_avg_stdev[tr_index]['gini_time_out'].append(res[15])
+                top_30_avg_stdev[tr_index]['avg_time_btw_tx'].append(res[14])
+
                 ft.append(np.concatenate((res, np.asarray(self.op_freq[tr_index][i], dtype='float64'))))
                 ft_opcodes.append(np.concatenate((np.asarray(['ponzi' if tr_index == 0 else 'non_ponzi']),
                                                   np.asarray(self.op_freq[tr_index][i], dtype='float64'))))
                 ft_basic.append(res)
-            self.cur_time = tl.compute_time(self.cur_time)
+            tl.compute_time(self.cur_time)
         self.ft = ft
         self.ft_opcodes = ft_opcodes
         self.ft_basic = ft_basic
+        self.top_30_avg_stdev = top_30_avg_stdev
         print("nbrs==========================")
         print(f"P={sum(nbrs[0]) / len(nbrs[0])}, NP={sum(nbrs[1]) / len(nbrs[1])}")
         print("lifes==========================")
         print(f"P={sum(lifes[0]) / len(lifes[0])}, NP={sum(lifes[1]) / len(lifes[1])}")
+
+        for i in self.op[0]:
+            top_30_avg_stdev[0]['size_info'].append(os.path.getsize(self.paths['db'] + 'ponzi/bcode/' + i + '.json'))
+        for i in self.op[1]:
+            top_30_avg_stdev[1]['size_info'].append(os.path.getsize(self.paths['db'] + 'non_ponzi/bcode/' + i + '.json'))
+        for tr_index in range(2):
+            print(f'tr_index={tr_index}')
+            for name, data in top_30_avg_stdev[tr_index].items():
+                print(f"name={name}, len={len(data)}")
+                avg = sum([float(each) for each in data]) / len(data)
+                print(f"\tname={name}, avg={avg}, stdev={statistics.stdev(data)}")
+
 
     @staticmethod
     def cal_value_time_in_out(args):
@@ -277,7 +328,7 @@ class Feature:
         df = pd.DataFrame(data=ft, columns=columns)
         df['size_info@NUMERIC'] = self.size_info
         # data.loc[:, data.columns != columns[0]] = data.loc[:, data.columns != columns[0]].astype(np.float64)
-        self.cur_time = tl.compute_time(self.cur_time)
+        tl.compute_time(self.cur_time)
         return df
 
     # deprecated
@@ -297,17 +348,28 @@ class Feature:
                 np.asarray(dum.drop(labels=[columns[0]] + columns[len(self.ft_names):], axis=1), dtype='float64'))) < out_index).all(
             axis=1)]
         self.df_out = df_out.append(self.df.drop(self.df[self.df[columns[0]] == 'non_ponzi'].index))
-        self.cur_time = tl.compute_time(self.cur_time)
+        tl.compute_time(self.cur_time)
 
-    def dump_arff(self):
+    def dump_arff(self, days):
         print("Dumping into arff files ...")
-        with open(self.paths['db'] + 'models/PONZI_' + str(self.J) + '.arff', 'w') as f:
+        if days < 10:
+            day = f"0000{days}"
+        elif days < 100:
+            day = f"000{days}"
+        elif days < 1000:
+            day = f"00{days}"
+        elif days < 10000:
+            day = f"0{days}"
+        else:
+            day = f"{days}"
+        with open(self.paths['arff'] + f'PONZI_{str(self.J)}_day_{day}.arff', 'w') as f:
             a2p.dump(self.df, f)
-        with open(self.paths['db'] + 'models/PONZI_opcodes_' + str(self.J) + '.arff', 'w') as f:
-            a2p.dump(self.df_opcodes, f)
-        with open(self.paths['db'] + 'models/PONZI_basic_' + str(self.J) + '.arff', 'w') as f:
-            a2p.dump(self.df_basic, f)
-        self.cur_time = tl.compute_time(self.cur_time)
+        # with open(self.paths['arff'] + 'PONZI_opcodes_' + str(self.J) + '.arff', 'w') as f:
+        #     a2p.dump(self.df_opcodes, f)
+        # with open(self.paths['arff'] + 'PONZI_basic_' + str(self.J) + '.arff', 'w') as f:
+        #     a2p.dump(self.df_basic, f)
+        tl.compute_time(self.cur_time)
+        self.tr_dico = {}
 
     def remaining_code(self):
         pass
@@ -364,4 +426,4 @@ class Feature:
 
 
 if __name__ == '__main__':
-    Feature().start()
+    Feature().start(289)

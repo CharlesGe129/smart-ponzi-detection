@@ -20,10 +20,11 @@
 
 from web3 import Web3
 import csv
+import os
 
 #sm_file = 'Smart_Contract_Addresses.list'
 sm_file = 'sm_add_nponzi.csv'
-path = '/Users/charles/charles/university/Master Project/go-ethereum/analysis_tool_python/SmartPonziDetection/'
+path = '../'
 database_bcode = path + 'dataset/'
 
 web3 = Web3(Web3.HTTPProvider('https://mainnet.infura.io/TO1X2JTG8k9PiaYd0iQr'))
@@ -35,28 +36,49 @@ web3 = Web3(Web3.HTTPProvider('https://mainnet.infura.io/TO1X2JTG8k9PiaYd0iQr'))
 #
 #
 # addresses = [pk[:42] for pklist in add for pk in pklist]
-with open(database_bcode + 'non_ponzi_collection.csv') as f:
-    truc = csv.reader(f)
-    csv_file = list(truc)
 
+for filename in ['ponzi_collection.csv']:
+    with open(database_bcode + filename) as f:
+        addresses = [line.split(',')[2] for line in f.readlines()][1:]
 
-addresses = [line[0].split('(')[0].strip() for line in csv_file if line[0] != 'addr']
+addresses = [each.split('.json')[0] for each in os.listdir(f"{database_bcode}/ponzi/bcode/") if each.endswith('.json')]
+print(addresses)
+print(len(addresses))
+addresses = sorted(addresses)
 
+except_addr = [each.split('.json')[0] for each in os.listdir(f"{database_bcode}/ponzi/opcode/") if each.endswith('.json')]
+print(len(except_addr))
+
+evmdis_path = '/Users/charlesge/go/bin/'
+for ad in addresses:
+    if ad in except_addr:
+        continue
+    # print(ad)
+    try:
+        print(f'cat {database_bcode}/ponzi/bcode/{ad}.json | {evmdis_path}/evmdis > {database_bcode}/ponzi/opcode/{ad}.json')
+        # os.system(f'cat {database_bcode}/ponzi/bcode/{ad}.json | {evmdis_path}/evmdis > {database_bcode}/ponzi/opcode/{ad}.json')
+    except:
+        pass
+
+print("done")
+input()
 
 i = 0
 for ad in addresses:
-    code = repr(web3.eth.getCode(web3.toChecksumAddress(ad)))[12:-2]
-    if code:
-        i += 1
-        # print(str(i) + ": " + ad)
-        with open(database_bcode + 'non_ponzi_bcode/' + ad + '.json', 'w') as f:
-            f.write(code)
-        f.close()
-    else:
+    try:
+        code = repr(web3.eth.getCode(web3.toChecksumAddress(ad)))[12:-2]
+        if code:
+            i += 1
+            # print(str(i) + ": " + ad)
+            with open(database_bcode + 'ponzi/bcode/' + ad + '.json', 'w') as f:
+                f.write(code)
+        else:
+            print(ad)
+        #Disasemble
         print(ad)
-    #Disasemble
-    #print(ad)
-    #os.system('cat /Users/e31989/Documents/sm_database/bytecode/' + ad +'.json | evmdis > /Users/e31989/Documents/features/' + ad + '.json' )
+        #os.system('cat /Users/e31989/Documents/sm_database/bytecode/' + ad +'.json | evmdis > /Users/e31989/Documents/features/' + ad + '.json' )
+    except Exception as e:
+        print(e)
     
 #for /r %i in (*.json); do cat "%i" | evmdis > "/Users/e31989/Documents/features/$~ni.json"; done
 #for %i in (*.json); do cat "%i" | evmdis > "/Users/e31989/Documents/features/$~ni.json"; done

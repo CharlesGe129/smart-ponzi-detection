@@ -37,7 +37,7 @@ import os
 
 PATH = '../dataset/'
 DB = PATH + 'sm_database/{}/'
-OPCODE_PATH = '/Users/charlesge/charles/university/Master_project/smart-ponzi-detection/dataset/non_ponzi/opcode/'
+OPCODE_PATH = '/Users/charlesge/charles/university/Master_project/smart-ponzi-detection/dataset/ponzi/opcode/'
 
 
 class EthCrawlerNormalTx:
@@ -53,11 +53,12 @@ class EthCrawlerNormalTx:
     def start(self):
         # with open(self.saved_file, 'w') as nml:
         #     nml.close()
-        addresses = self.addresses
-        i = 0
-        while addresses[i] != '0x2a0c0dbecc7e4d658f48e01e3fa353f44050c208':
-            i += 1
-        self.addresses = addresses[i:]
+        # # Start where last time stopped
+        # addresses = self.addresses
+        # i = 0
+        # while addresses[i] != '0xD8002cD05d5B2a85557e1CAAa179cC2408D5ad42':
+        #     i += 1
+        # self.addresses = addresses[i:]
         [self.crawl(addr) for addr in self.addresses]
 
     def crawl(self, addr):
@@ -180,13 +181,14 @@ if __name__ == '__main__':
 
     # crawling
     # files = ['ponzi_collection.csv', 'non_ponzi_collection.csv']
-    # files = ['ponzi_collection.csv']
-    files = ['non_ponzi_collection.csv']
+    files = ['ponzi_collection.csv']
+    # files = ['non_ponzi_collection.csv']
     for pz_file in files:
         with open(PATH + pz_file, 'rt') as f:
             csv_data = list(csv.reader(f))
         addr_index = 2 if pz_file.startswith('ponzi') else 0
         addresses = [line[addr_index].split(',')[0].split(' ')[0] for line in csv_data[1:]]
+        print(f"len_addr={len(addresses)}")
         saved_file = DB.format('normal' if pz_file.startswith('ponzi') else 'normal_np')
         EthCrawlerNormalTx(addresses, saved_file, revert).start()
         saved_file = DB.format('internal' if pz_file.startswith('ponzi') else 'internal_np')
